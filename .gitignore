@@ -1,0 +1,40 @@
+# VSCode
+.vscode/
+
+# Build directories
+build/
+**/build/
+**/cmake-build-*/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.env/
+.venv/
+
+# C++ build artifacts
+*.o
+*.obj
+*.exe
+*.out
+*.app
+*.dll
+*.dylib
+*.so
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+
+# IDE specific files
+.idea/
+*.swp
+*.swo
+.DS_Store 
