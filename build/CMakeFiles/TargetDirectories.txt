@@ -1,0 +1,3 @@
+/Users/johashhh/Desktop/Risma/build/CMakeFiles/risma_cpp.dir
+/Users/johashhh/Desktop/Risma/build/CMakeFiles/edit_cache.dir
+/Users/johashhh/Desktop/Risma/build/CMakeFiles/rebuild_cache.dir
