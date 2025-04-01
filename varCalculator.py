@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import yfinance as yf
-import _varCalculator
+import _package
 
 
 
@@ -32,8 +32,8 @@ def calculate_var():
     
     for confidence in confidence_levels:
         # Use the C++ implementation for VaR calculations
-        var = _varCalculator.calculate_var(confidence, mean_return, volatility)
-        var_dollar = _varCalculator.calculate_dollar_var(initial_investment, var)
+        var = _package.calculate_var(confidence, mean_return, volatility)
+        var_dollar = _package.calculate_dollar_var(initial_investment, var)
         
         print(f"\nAt {confidence*100}% confidence level:")
         print(f"Daily VaR: ${var_dollar:,.2f}")

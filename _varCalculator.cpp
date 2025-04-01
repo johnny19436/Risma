@@ -65,7 +65,7 @@ double calculate_dollar_var(double initial_investment, double var_percent) {
     return initial_investment * std::abs(var_percent);
 }
 
-PYBIND11_MODULE(_varCalculator, m) {
+void bind_var_calculator(py::module_ &m) {
     m.doc() = "VaR calculations implemented in C++";
     m.def("calculate_var", &calculate_var, "Calculate Value at Risk");
     m.def("calculate_dollar_var", &calculate_dollar_var, "Calculate Dollar VaR");
@@ -77,3 +77,16 @@ PYBIND11_MODULE(_varCalculator, m) {
 
     m.def("run_monte_carlo", &VaRCalculator::runMonteCarlo, "Run Monte Carlo simulations");
 }
+
+// PYBIND11_MODULE(_varCalculator, m) {
+//     m.doc() = "VaR calculations implemented in C++";
+//     m.def("calculate_var", &calculate_var, "Calculate Value at Risk");
+//     m.def("calculate_dollar_var", &calculate_dollar_var, "Calculate Dollar VaR");
+
+//     py::class_<VaRCalculator>(m, "VaRCalculator")
+//         .def(py::init<double>())
+//         .def("compute_var", &VaRCalculator::computeVaR)
+//         .def("compute_es", &VaRCalculator::computeES);
+
+//     m.def("run_monte_carlo", &VaRCalculator::runMonteCarlo, "Run Monte Carlo simulations");
+// }

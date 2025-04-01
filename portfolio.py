@@ -1,4 +1,4 @@
-import _varCalculator
+import _package
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -19,8 +19,8 @@ def create_portfolio():
     returns = portfolio_data.pct_change().dropna()
     
     # Use the C++ implementation for calculations
-    portfolio_return = _varCalculator.calculate_portfolio_return(returns.values, weights)
-    portfolio_volatility = _varCalculator.calculate_portfolio_volatility(returns.values, weights)
+    portfolio_return = _package.calculate_portfolio_return(returns.values, weights)
+    portfolio_volatility = _package.calculate_portfolio_volatility(returns.values, weights)
     
     print("Portfolio Composition:")
     for stock, weight in zip(stocks, weights):

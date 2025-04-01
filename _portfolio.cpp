@@ -67,7 +67,7 @@ double calculate_portfolio_volatility(py::array_t<double> returns, py::array_t<d
     return std::sqrt(variance);
 }
 
-PYBIND11_MODULE(_portfolio, m) {
+void bind_portfolio(py::module_ &m) {
     m.doc() = "Portfolio calculations implemented in C++";
     m.def("calculate_portfolio_return", &calculate_portfolio_return, "Calculate portfolio return");
     m.def("calculate_portfolio_volatility", &calculate_portfolio_volatility, "Calculate portfolio volatility");
