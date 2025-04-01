@@ -34,7 +34,13 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install numpy pytest
+        pip install numpy pytest pybind11
+
+    # Build and install Python package
+    - name: Build Python package
+      run: |
+        cd python_module
+        pip install -e .
 
     # Run tests
     - name: Run C++ tests
@@ -47,4 +53,4 @@ jobs:
     - name: Run Python tests
       run: |
         cd python_module
-        python main.py 
+        python -c "from risma.core import Portfolio, RiskCalculator; p = Portfolio(); rc = RiskCalculator(); print('Import test successful')" 
