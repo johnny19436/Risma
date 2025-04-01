@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include <memory>
-#include "portfolio.hpp"
+#include "_portfolio.hpp"
 
 class VaRCalculator {
 public:
@@ -9,8 +9,8 @@ public:
     
     double computeVaR(const Portfolio& portfolio, int num_simulations = 100000);
     double computeES(const Portfolio& portfolio, int num_simulations = 100000);
+    std::vector<double> runMonteCarlo(const Portfolio& portfolio, int num_simulations);
 
 private:
     double confidence_level_; 
-    std::vector<double> runMonteCarlo(const Portfolio& portfolio, int num_simulations);
 }; 

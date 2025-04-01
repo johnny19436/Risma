@@ -1,7 +1,11 @@
-#include "var_calculator.hpp"
+#include "_varCalculator.hpp"
+#include <pybind11/pybind11.h>
+#include <boost/math/special_functions/erf.hpp>
 #include <algorithm>
 #include <random>
 #include <cmath>
+
+namespace py = pybind11;
 
 VaRCalculator::VaRCalculator(double confidence_level)
     : confidence_level_(confidence_level) {}
@@ -48,3 +52,28 @@ std::vector<double> VaRCalculator::runMonteCarlo(const Portfolio& portfolio, int
     
     return returns;
 } 
+
+double calculate_var(double confidence_level, double mean_return, double volatility) {
+    // Using the inverse normal distribution formula
+    // double z_score = -std::sqrt(2.0) * std::erfinv(2.0 * confidence_level - 1.0);
+    double z_score = -std::sqrt(2.0) * boost::math::erf_inv(2.0 * confidence_level - 1.0);
+
+    return mean_return - (z_score * volatility);
+}
+
+double calculate_dollar_var(double initial_investment, double var_percent) {
+    return initial_investment * std::abs(var_percent);
+}
+
+PYBIND11_MODULE(_varCalculator, m) {
+    m.doc() = "VaR calculations implemented in C++";
+    m.def("calculate_var", &calculate_var, "Calculate Value at Risk");
+    m.def("calculate_dollar_var", &calculate_dollar_var, "Calculate Dollar VaR");
+
+    py::class_<VaRCalculator>(m, "VaRCalculator")
+        .def(py::init<double>())
+        .def("compute_var", &VaRCalculator::computeVaR)
+        .def("compute_es", &VaRCalculator::computeES);
+
+    m.def("run_monte_carlo", &VaRCalculator::runMonteCarlo, "Run Monte Carlo simulations");
+}
