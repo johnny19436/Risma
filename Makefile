@@ -36,7 +36,7 @@ LDFLAGS := $(PYTHON_LDFLAGS) $(BLAS_LIB) $(HOMEBREW_LIB)
 # SRC := _portfolio.cpp _varCalculator.cpp
 # TARGET :=  _portfolio$(shell $(PYTHON)-config --extension-suffix) _varCalculator$(shell $(PYTHON)-config --extension-suffix)
 
-SRC := _package.cpp _varCalculator.cpp _portfolio.cpp
+SRC := _package.cpp _calculator.cpp _portfolioManager.cpp
 TARGET :=  _package$(shell $(PYTHON)-config --extension-suffix)
 
 .PHONY: all test clean
