@@ -1,26 +1,10 @@
 #!/usr/bin/env python3
 import argparse
 import sys
+import shlex
 
 # Import the C++ module built with pybind11.
-# Adjust the module name if needed.
 import _package as riskcalc
-
-# Create a global PortfolioManager and Calculator instance.
-# The Calculator is initialized with a default confidence level (0.95).
-
-# To add a portfolio:
-# python cli.py add_portfolio --name MyPortfolio --datafolder ./data
-
-# To switch to a portfolio:
-# python cli.py switch_portfolio --name MyPortfolio
-
-# To add an asset:
-# python cli.py add_asset --symbol AAPL --weight 0.15
-
-# To compute VaR with a 95% confidence level:
-# python cli.py compute_var --confidence 0.95
-
 
 manager = riskcalc.PortfolioManager()
 calc = riskcalc.Calculator(0.95)
@@ -102,8 +86,8 @@ def list_assets(args):
         assets = portfolio.listAssets()
         if assets:
             print(f"Assets in portfolio '{portfolio.getName()}':")
-            for symbol, weight in assets:
-                print(f"  {symbol}: weight={weight}")
+            for asset in assets:
+                print(f"  {asset.symbol}: weight={asset.weight}, volatility={asset.volatility}")
         else:
             print(f"No assets in portfolio '{portfolio.getName()}'.")
     except Exception as e:
@@ -115,7 +99,6 @@ def compute_var(args):
         if portfolio is None:
             print("No active portfolio. Please switch to a portfolio first.")
             return
-        # Set confidence level if provided
         if args.confidence:
             calc.set_confidence_level(args.confidence)
         var_value = calc.compute_var(portfolio, args.simulations)
@@ -129,7 +112,6 @@ def compute_es(args):
         if portfolio is None:
             print("No active portfolio. Please switch to a portfolio first.")
             return
-        # Set confidence level if provided
         if args.confidence:
             calc.set_confidence_level(args.confidence)
         es_value = calc.compute_es(portfolio, args.simulations)
@@ -137,52 +119,94 @@ def compute_es(args):
     except Exception as e:
         print(f"Error computing ES: {e}")
 
-def compute_volatility(args):
-    try:
-        # Compute volatility for the given symbol using the Calculator's function.
-        vol = calc.computeVolatility(args.symbol)
-        print(f"Volatility for asset '{args.symbol}': {vol}")
-    except Exception as e:
-        print(f"Error computing volatility: {e}")
+def build_command_parsers():
+    commands = {}
+
+    # add_portfolio
+    parser = argparse.ArgumentParser(prog="add_portfolio")
+    parser.add_argument("--name", required=True)
+    parser.add_argument("--datafolder", required=True)
+    commands["add_portfolio"] = (parser, add_portfolio)
+
+    # del_portfolio
+    parser = argparse.ArgumentParser(prog="del_portfolio")
+    parser.add_argument("--name", required=True)
+    commands["del_portfolio"] = (parser, del_portfolio)
+
+    # switch_portfolio
+    parser = argparse.ArgumentParser(prog="switch_portfolio")
+    parser.add_argument("--name", required=True)
+    commands["switch_portfolio"] = (parser, switch_portfolio)
+
+    # list_portfolios
+    parser = argparse.ArgumentParser(prog="list_portfolios")
+    commands["list_portfolios"] = (parser, list_portfolios)
+
+    # add_asset
+    parser = argparse.ArgumentParser(prog="add_asset")
+    parser.add_argument("--symbol", required=True)
+    parser.add_argument("--weight", type=float, required=True)
+    commands["add_asset"] = (parser, add_asset)
+
+    # modify_asset
+    parser = argparse.ArgumentParser(prog="modify_asset")
+    parser.add_argument("--symbol", required=True)
+    parser.add_argument("--weight", type=float, required=True)
+    commands["modify_asset"] = (parser, modify_asset)
+
+    # del_asset
+    parser = argparse.ArgumentParser(prog="del_asset")
+    parser.add_argument("--symbol", required=True)
+    commands["del_asset"] = (parser, del_asset)
+
+    # list_assets
+    parser = argparse.ArgumentParser(prog="list_assets")
+    commands["list_assets"] = (parser, list_assets)
+
+    # compute_var
+    parser = argparse.ArgumentParser(prog="compute_var")
+    parser.add_argument("--confidence", type=float, default=None)
+    parser.add_argument("--simulations", type=int, default=100000)
+    commands["compute_var"] = (parser, compute_var)
+
+    # compute_es
+    parser = argparse.ArgumentParser(prog="compute_es")
+    parser.add_argument("--confidence", type=float, default=None)
+    parser.add_argument("--simulations", type=int, default=100000)
+    commands["compute_es"] = (parser, compute_es)
+
+    return commands
 
 def interactive():
     print("Entering interactive mode. Type 'help' for commands, 'exit' to quit.")
+    commands = build_command_parsers()
     while True:
         try:
-            command = input(">> ").strip()
-            if command in ['exit', 'quit']:
+            command_line = input(">> ").strip()
+            if command_line in ['exit', 'quit']:
                 break
-            elif command == 'help':
+            if command_line == "help":
                 print("Available commands:")
-                print("  add_portfolio --name NAME --datafolder PATH")
-                print("  switch_portfolio --name NAME")
-                print("  add_asset --symbol SYMBOL --weight WEIGHT")
-                print("  list_portfolios")
-                print("  list_assets")
-                print("  compute_var --confidence CONF --simulations N")
+                for cmd in commands:
+                    print("  " + cmd)
                 continue
-            # Parse the input into arguments using split (a more robust solution would use shlex)
-            args = command.split()
-            if not args:
+            if not command_line:
                 continue
-            subcommand = args[0]
-            if subcommand == "add_portfolio":
-                parser = argparse.ArgumentParser(prog="add_portfolio")
-                parser.add_argument("--name", required=True)
-                parser.add_argument("--datafolder", required=True)
-                parsed = parser.parse_args(args[1:])
-                add_portfolio(parsed)
-            elif subcommand == "switch_portfolio":
-                parser = argparse.ArgumentParser(prog="switch_portfolio")
-                parser.add_argument("--name", required=True)
-                parsed = parser.parse_args(args[1:])
-                switch_portfolio(parsed)
-            # Add additional commands here similarly...
-            else:
+            # Use shlex to split the command preserving quoted strings
+            args_list = shlex.split(command_line)
+            cmd_name = args_list[0]
+            if cmd_name not in commands:
                 print("Unknown command. Type 'help' for available commands.")
+                continue
+            parser, func = commands[cmd_name]
+            try:
+                parsed_args = parser.parse_args(args_list[1:])
+            except SystemExit:
+                # argparse raises SystemExit on error; just continue the loop.
+                continue
+            func(parsed_args)
         except Exception as e:
             print(f"Error: {e}")
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -190,64 +214,7 @@ def main():
     )
     subparsers = parser.add_subparsers(title="subcommands", dest="command")
     
-    # add_portfolio
-    parser_add_portfolio = subparsers.add_parser("add_portfolio", help="Add a new portfolio")
-    parser_add_portfolio.add_argument("--name", required=True, help="Portfolio name")
-    parser_add_portfolio.add_argument("--datafolder", required=True, help="Data folder for portfolio")
-    parser_add_portfolio.set_defaults(func=add_portfolio)
-
-    # del_portfolio
-    parser_del_portfolio = subparsers.add_parser("del_portfolio", help="Delete a portfolio")
-    parser_del_portfolio.add_argument("--name", required=True, help="Portfolio name")
-    parser_del_portfolio.set_defaults(func=del_portfolio)
-
-    # switch_portfolio
-    parser_switch_portfolio = subparsers.add_parser("switch_portfolio", help="Switch active portfolio")
-    parser_switch_portfolio.add_argument("--name", required=True, help="Portfolio name")
-    parser_switch_portfolio.set_defaults(func=switch_portfolio)
-
-    # list_portfolios
-    parser_list_portfolios = subparsers.add_parser("list_portfolios", help="List all portfolios")
-    parser_list_portfolios.set_defaults(func=list_portfolios)
-
-    # add_asset
-    parser_add_asset = subparsers.add_parser("add_asset", help="Add asset to active portfolio")
-    parser_add_asset.add_argument("--symbol", required=True, help="Asset symbol")
-    parser_add_asset.add_argument("--weight", type=float, required=True, help="Asset weight")
-    parser_add_asset.set_defaults(func=add_asset)
-
-    # modify_asset
-    parser_modify_asset = subparsers.add_parser("modify_asset", help="Modify asset weight in active portfolio")
-    parser_modify_asset.add_argument("--symbol", required=True, help="Asset symbol")
-    parser_modify_asset.add_argument("--weight", type=float, required=True, help="New asset weight")
-    parser_modify_asset.set_defaults(func=modify_asset)
-
-    # del_asset
-    parser_del_asset = subparsers.add_parser("del_asset", help="Delete asset from active portfolio")
-    parser_del_asset.add_argument("--symbol", required=True, help="Asset symbol")
-    parser_del_asset.set_defaults(func=del_asset)
-
-    # list_assets
-    parser_list_assets = subparsers.add_parser("list_assets", help="List assets in active portfolio")
-    parser_list_assets.set_defaults(func=list_assets)
-
-    # compute_var
-    parser_compute_var = subparsers.add_parser("compute_var", help="Compute portfolio VaR")
-    parser_compute_var.add_argument("--confidence", type=float, help="Confidence level (e.g., 0.95)")
-    parser_compute_var.add_argument("--simulations", type=int, default=100000, help="Number of Monte Carlo simulations")
-    parser_compute_var.set_defaults(func=compute_var)
-
-    # compute_es
-    parser_compute_es = subparsers.add_parser("compute_es", help="Compute portfolio Expected Shortfall (ES)")
-    parser_compute_es.add_argument("--confidence", type=float, help="Confidence level (e.g., 0.95)")
-    parser_compute_es.add_argument("--simulations", type=int, default=100000, help="Number of Monte Carlo simulations")
-    parser_compute_es.set_defaults(func=compute_es)
-
-    # compute_volatility
-    parser_compute_vol = subparsers.add_parser("compute_volatility", help="Compute volatility for an asset in active portfolio")
-    parser_compute_vol.add_argument("--symbol", required=True, help="Asset symbol")
-    parser_compute_vol.set_defaults(func=compute_volatility)
-
+    # Non-interactive commands (if desired)
     parser_interactive = subparsers.add_parser("interactive", help="Run in interactive mode")
     parser_interactive.set_defaults(func=lambda args: interactive())
 
