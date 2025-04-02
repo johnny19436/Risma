@@ -29,7 +29,7 @@ double Calculator::computeVaR(const Portfolio& portfolio, int num_simulations) {
     auto returns = runMonteCarlo(portfolio, num_simulations);
     std::sort(returns.begin(), returns.end());
     int var_index = static_cast<int>((1.0 - confidence_level_) * num_simulations);
-    return -returns[var_index] * portfolio.getAssetTotalValue();
+    return -returns[var_index] * portfolio.getAssetTotalWeight();
 }
 
 double Calculator::computeES(const Portfolio& portfolio, int num_simulations) {
@@ -40,7 +40,7 @@ double Calculator::computeES(const Portfolio& portfolio, int num_simulations) {
     for (int i = 0; i < var_index; ++i) {
         es += returns[i];
     }
-    return -(es / var_index) * portfolio.getAssetTotalValue();
+    return -(es / var_index) * portfolio.getAssetTotalWeight();
 }
 
 std::vector<double> Calculator::runMonteCarlo(const Portfolio& portfolio, int num_simulations) {

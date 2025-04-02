@@ -32,9 +32,20 @@ void Portfolio::addAsset(const std::string &symbol, float weight) {
     }
 
     std::string line;
-    // Read the header line to get column names
-    if (!std::getline(file, line)) {
-        throw std::runtime_error("File is empty: " + filename);
+    // Read the header line to get column names; if empty, call update_csv
+    if (!std::getline(file, line) || line.empty()) {
+        file.close();
+        // File is empty: call external Python script to create data for this symbol.
+        std::string command = "python update_csv.py \"" + filename + "\" " + symbol;
+        int ret = std::system(command.c_str());
+        if (ret != 0) {
+            throw std::runtime_error("Failed to update CSV for symbol: " + symbol);
+        }
+        // Re-open the file after update.
+        file.open(filename);
+        if (!file.is_open() || !std::getline(file, line) || line.empty()) {
+            throw std::runtime_error("File is still empty after update: " + filename);
+        }
     }
 
     std::istringstream headerStream(line);
@@ -44,7 +55,7 @@ void Portfolio::addAsset(const std::string &symbol, float weight) {
         headers.push_back(header);
     }
 
-    // Find the index for the requested symbol
+    // Check if the symbol exists in the CSV header.
     int symbolIndex = -1;
     for (int i = 0; i < static_cast<int>(headers.size()); ++i) {
         if (headers[i] == symbol) {
@@ -52,8 +63,36 @@ void Portfolio::addAsset(const std::string &symbol, float weight) {
             break;
         }
     }
+    
+    // If the symbol is not found, update the CSV file by calling an external Python script.
     if (symbolIndex == -1) {
-        throw std::runtime_error("Symbol not found in data file: " + symbol);
+        std::string command = "python update_csv.py \"" + filename + "\" " + symbol;
+        int ret = std::system(command.c_str());
+        if (ret != 0) {
+            throw std::runtime_error("Failed to update CSV for symbol: " + symbol);
+        }
+        // Re-open the file to refresh the header.
+        file.close();
+        file.open(filename);
+        if (!file.is_open() || !std::getline(file, line)) {
+            throw std::runtime_error("Unable to re-read file after update: " + filename);
+        }
+        headerStream.clear();
+        headerStream.str(line);
+        headers.clear();
+        while (std::getline(headerStream, header, ',')) {
+            headers.push_back(header);
+        }
+        // Find the index again.
+        for (int i = 0; i < static_cast<int>(headers.size()); ++i) {
+            if (headers[i] == symbol) {
+                symbolIndex = i;
+                break;
+            }
+        }
+        if (symbolIndex == -1) {
+            throw std::runtime_error("Symbol still not found in data file after update: " + symbol);
+        }
     }
 
     // Read price data for the given symbol
@@ -113,6 +152,7 @@ void Portfolio::addAsset(const std::string &symbol, float weight) {
     assetsVolatility_[symbol] = static_cast<float>(vol);
 }
 
+
 void Portfolio::modifyAsset(const std::string &symbol, float weight) {
     // Only modify if the asset exists
     if (assetsWeight_.find(symbol) != assetsWeight_.end()) {
@@ -123,8 +163,106 @@ void Portfolio::modifyAsset(const std::string &symbol, float weight) {
 }
 
 void Portfolio::delAsset(const std::string &symbol) {
+    // Erase asset from in-memory maps.
     assetsWeight_.erase(symbol);
     assetsVolatility_.erase(symbol);
+
+    // Construct file path for the CSV file.
+    std::string filename = dataFolder_ + "/prices.csv";
+    fs::path filePath(filename);
+    
+    if (!fs::exists(filePath)) {
+        // If file doesn't exist, nothing more to do.
+        return;
+    }
+    
+    // Read the entire CSV file.
+    std::ifstream infile(filename);
+    if (!infile.is_open()) {
+        throw std::runtime_error("Unable to open file for reading: " + filename);
+    }
+    
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(infile, line)) {
+        lines.push_back(line);
+    }
+    infile.close();
+
+    if (lines.empty()) {
+        // Nothing to update if file is empty.
+        return;
+    }
+
+    // Process the header to determine the index of the column to remove.
+    std::istringstream headerStream(lines[0]);
+    std::string token;
+    std::vector<std::string> headers;
+    while (std::getline(headerStream, token, ',')) {
+        headers.push_back(token);
+    }
+    
+    // Find index of the asset's column.
+    int colIndex = -1;
+    for (size_t i = 0; i < headers.size(); ++i) {
+        if (headers[i] == symbol) {
+            colIndex = static_cast<int>(i);
+            break;
+        }
+    }
+    if (colIndex == -1) {
+        // Asset column not found in file, so nothing to remove.
+        return;
+    }
+    
+    // Remove the asset's header.
+    headers.erase(headers.begin() + colIndex);
+    
+    // Prepare a vector to hold updated lines.
+    std::vector<std::string> updatedLines;
+    
+    // Rebuild header line.
+    std::ostringstream newHeader;
+    for (size_t i = 0; i < headers.size(); ++i) {
+        newHeader << headers[i];
+        if (i != headers.size() - 1) {
+            newHeader << ",";
+        }
+    }
+    updatedLines.push_back(newHeader.str());
+    
+    // Process each subsequent line: remove the cell at colIndex.
+    for (size_t i = 1; i < lines.size(); ++i) {
+        std::istringstream lineStream(lines[i]);
+        std::string cell;
+        std::vector<std::string> cells;
+        while (std::getline(lineStream, cell, ',')) {
+            cells.push_back(cell);
+        }
+        // If the number of cells matches header count+1, remove the unwanted cell.
+        if (cells.size() > static_cast<size_t>(colIndex)) {
+            cells.erase(cells.begin() + colIndex);
+        }
+        // Rebuild the line.
+        std::ostringstream newLine;
+        for (size_t j = 0; j < cells.size(); ++j) {
+            newLine << cells[j];
+            if (j != cells.size() - 1) {
+                newLine << ",";
+            }
+        }
+        updatedLines.push_back(newLine.str());
+    }
+    
+    // Write the updated CSV back to the file.
+    std::ofstream outfile(filename, std::ios::trunc);
+    if (!outfile.is_open()) {
+        throw std::runtime_error("Unable to open file for writing: " + filename);
+    }
+    for (const auto &l : updatedLines) {
+        outfile << l << "\n";
+    }
+    outfile.close();
 }
 
 std::vector<Asset> Portfolio::listAssets() const {

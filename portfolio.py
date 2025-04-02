@@ -14,7 +14,6 @@ def create_portfolio():
     for stock in stocks:
         data = yf.download(stock, start='2022-01-01', end='2024-01-01')['Close']
         portfolio_data[stock] = data
-    print(portfolio_data)
     
     # # Calculate portfolio returns
     # returns = portfolio_data.pct_change().dropna()
