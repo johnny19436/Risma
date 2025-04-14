@@ -10,6 +10,11 @@ HOMEBREW_INCLUDE := /opt/homebrew/include
 HOMEBREW_LIB := -L/opt/homebrew/lib -lboost_math_c99
 
 # Pybind11 include path
+# PYBIND11_INCLUDE := $(shell $(PYTHON) -m pybind11 --includes 2>/dev/null | sed 's/-I//')
+# ifeq ($(PYBIND11_INCLUDE),)
+# 	PYBIND11_INCLUDE := /usr/include/pybind11
+# endif
+# PYBIND11_INCLUDE := $(shell $(PYTHON) -c "import pybind11; print(pybind11.get_include())" 2>/dev/null)
 PYBIND11_INCLUDE := $(shell $(PYTHON) -m pybind11 --includes 2>/dev/null | sed 's/-I//')
 ifeq ($(PYBIND11_INCLUDE),)
 	PYBIND11_INCLUDE := /usr/include/pybind11
