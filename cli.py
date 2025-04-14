@@ -121,6 +121,10 @@ def compute_es(args):
 
 def build_command_parsers():
     commands = {}
+    # echo_marker
+    parser = argparse.ArgumentParser(prog="echo_marker")
+    parser.add_argument("label", help="Print a label for timing/debugging")
+    commands["echo_marker"] = (parser, lambda args: print(f"<<{args.label}>>"))
 
     # add_portfolio
     parser = argparse.ArgumentParser(prog="add_portfolio")
@@ -182,7 +186,13 @@ def interactive():
     commands = build_command_parsers()
     while True:
         try:
-            command_line = input(">> ").strip()
+            print(">> ", end="", flush=True)
+            command_line = sys.stdin.readline()
+            if not command_line:  # EOF reached
+                break
+            command_line = command_line.strip()
+
+            # command_line = input(">> ").strip()
             if command_line in ['exit', 'quit']:
                 break
             if command_line == "help":
@@ -213,6 +223,13 @@ def main():
         description="Portfolio Manager CLI: Manage portfolios and compute risk metrics."
     )
     subparsers = parser.add_subparsers(title="subcommands", dest="command")
+    commands = build_command_parsers() 
+
+    # Register all available commands from build_command_parsers
+    for cmd_name, (subparser, func) in commands.items():
+        subparser.prog = cmd_name
+        subparser.set_defaults(func=func)
+        subparsers._name_parser_map[cmd_name] = subparser
     
     # Non-interactive commands (if desired)
     parser_interactive = subparsers.add_parser("interactive", help="Run in interactive mode")

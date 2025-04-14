@@ -1,9 +1,12 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <unordered_set>
 #include "_portfolioManager.h"
+
 
 namespace fs = std::filesystem;
 namespace py = pybind11;
@@ -21,7 +24,13 @@ const std::string& Portfolio::getDataFolder() const {
 }
 
 void Portfolio::addAsset(const std::string &symbol, float weight) {
-    // Insert or update asset weight
+    // Skip if already added
+    if (assetsWeight_.count(symbol)) {
+        std::cerr << "[Info] Asset already added: " << symbol << std::endl;
+        return;
+    }
+
+    // Insert new asset symbol
     assetsWeight_[symbol] = weight;
 
     // Construct file path (assumes CSV file named "prices.csv" in dataFolder_)
@@ -32,16 +41,13 @@ void Portfolio::addAsset(const std::string &symbol, float weight) {
     }
 
     std::string line;
-    // Read the header line to get column names; if empty, call update_csv
     if (!std::getline(file, line) || line.empty()) {
         file.close();
-        // File is empty: call external Python script to create data for this symbol.
         std::string command = "python update_csv.py \"" + filename + "\" " + symbol;
         int ret = std::system(command.c_str());
         if (ret != 0) {
             throw std::runtime_error("Failed to update CSV for symbol: " + symbol);
         }
-        // Re-open the file after update.
         file.open(filename);
         if (!file.is_open() || !std::getline(file, line) || line.empty()) {
             throw std::runtime_error("File is still empty after update: " + filename);
@@ -55,7 +61,6 @@ void Portfolio::addAsset(const std::string &symbol, float weight) {
         headers.push_back(header);
     }
 
-    // Check if the symbol exists in the CSV header.
     int symbolIndex = -1;
     for (int i = 0; i < static_cast<int>(headers.size()); ++i) {
         if (headers[i] == symbol) {
@@ -63,15 +68,12 @@ void Portfolio::addAsset(const std::string &symbol, float weight) {
             break;
         }
     }
-    
-    // If the symbol is not found, update the CSV file by calling an external Python script.
     if (symbolIndex == -1) {
         std::string command = "python update_csv.py \"" + filename + "\" " + symbol;
         int ret = std::system(command.c_str());
         if (ret != 0) {
             throw std::runtime_error("Failed to update CSV for symbol: " + symbol);
         }
-        // Re-open the file to refresh the header.
         file.close();
         file.open(filename);
         if (!file.is_open() || !std::getline(file, line)) {
@@ -83,7 +85,6 @@ void Portfolio::addAsset(const std::string &symbol, float weight) {
         while (std::getline(headerStream, header, ',')) {
             headers.push_back(header);
         }
-        // Find the index again.
         for (int i = 0; i < static_cast<int>(headers.size()); ++i) {
             if (headers[i] == symbol) {
                 symbolIndex = i;
@@ -95,7 +96,6 @@ void Portfolio::addAsset(const std::string &symbol, float weight) {
         }
     }
 
-    // Read price data for the given symbol
     std::vector<double> prices;
     while (std::getline(file, line)) {
         if (line.empty()) continue;
@@ -126,21 +126,18 @@ void Portfolio::addAsset(const std::string &symbol, float weight) {
         throw std::runtime_error("Not enough data to compute volatility for symbol: " + symbol);
     }
 
-    // Compute daily returns: (price[t] - price[t-1]) / price[t-1]
     std::vector<double> returns;
     for (size_t i = 1; i < prices.size(); ++i) {
         double dailyReturn = (prices[i] - prices[i - 1]) / prices[i - 1];
         returns.push_back(dailyReturn);
     }
 
-    // Calculate mean of returns
     double sum = 0.0;
     for (double r : returns) {
         sum += r;
     }
     double mean = sum / returns.size();
 
-    // Calculate sample standard deviation (volatility)
     double variance = 0.0;
     for (double r : returns) {
         variance += (r - mean) * (r - mean);
@@ -148,7 +145,6 @@ void Portfolio::addAsset(const std::string &symbol, float weight) {
     variance /= (returns.size() - 1);
     double vol = std::sqrt(variance);
 
-    // Update asset volatility with computed value
     assetsVolatility_[symbol] = static_cast<float>(vol);
 }
 

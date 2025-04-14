@@ -19,11 +19,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y ocl-icd-opencl-dev
 
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
+    # - name: Configure CMake
+    #   run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
 
-    - name: Build C++
-      run: cmake --build ${{github.workspace}}/build --config Release
+    # - name: Build C++
+    #   run: cmake --build ${{github.workspace}}/build --config Release
 
     # Set up Python environment
     - name: Set up Python
@@ -36,21 +36,28 @@ jobs:
         python -m pip install --upgrade pip
         pip install numpy pytest pybind11
 
-    # Build and install Python package
-    - name: Build Python package
+    - name: Install system dependencies
       run: |
-        cd python_module
-        pip install -e .
+        sudo apt-get update
+        sudo apt-get install -y g++ make intel-mkl-full libopenblas-dev libboost-all-dev ocl-icd-opencl-dev
+
+    # - name: Build Python package
+    #   run: |
+    #     cd python_module
+    #     pip install -e .
+
+    - name: Build shared object
+      run: make
+
+    - name: Run tests
+      run: make test
 
     # Run tests
-    - name: Run C++ tests
-      working-directory: ${{github.workspace}}/build
-      run: |
-        if [ -f risma_cpp ]; then
-          ./risma_cpp
-        fi
+    # - name: Run C++ tests
+    #   working-directory: ${{github.workspace}}/build
+    #   run: |
+    #     if [ -f risma_cpp ]; then
+    #       ./risma_cpp
+    #     fi
 
-    - name: Run Python tests
-      run: |
-        cd python_module
-        python -c "from risma.core import Portfolio, RiskCalculator; p = Portfolio(); rc = RiskCalculator(); print('Import test successful')" 
+    
