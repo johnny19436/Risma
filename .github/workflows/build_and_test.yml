@@ -36,21 +36,23 @@ jobs:
         python -m pip install --upgrade pip
         pip install numpy pytest pybind11
 
-    # Build and install Python package
     - name: Build Python package
       run: |
         cd python_module
         pip install -e .
 
-    # Run tests
-    - name: Run C++ tests
-      working-directory: ${{github.workspace}}/build
-      run: |
-        if [ -f risma_cpp ]; then
-          ./risma_cpp
-        fi
+    - name: Build shared object
+      run: make
 
-    - name: Run Python tests
-      run: |
-        cd python_module
-        python -c "from risma.core import Portfolio, RiskCalculator; p = Portfolio(); rc = RiskCalculator(); print('Import test successful')" 
+    - name: Run tests
+      run: make test
+
+    # Run tests
+    # - name: Run C++ tests
+    #   working-directory: ${{github.workspace}}/build
+    #   run: |
+    #     if [ -f risma_cpp ]; then
+    #       ./risma_cpp
+    #     fi
+
+    

@@ -48,7 +48,7 @@ $(TARGET): $(SRC)
 
 
 test: all
-	$(PYTHON) -m pytest --maxfail=1 --disable-warnings -q
+	$(PYTHON) -m pytest test --maxfail=1 --disable-warnings -q
 	
 clean:
 	rm -f $(TARGET)
