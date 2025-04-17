@@ -34,7 +34,9 @@ else
     $(error "Unsupported OS: $(UNAME_S)")
 endif
 
-CXXFLAGS := -O3 -march=native -std=c++17 -fPIC
+# CXXFLAGS change to profile mode
+# CXXFLAGS := -O3 -march=native -std=c++17 -fPIC
+CXXFLAGS := -O2 -g -fno-omit-frame-pointer -std=c++17 -fPIC
 INCLUDES := -I$(PYBIND11_INCLUDE) -I$(BLAS_INCLUDE) -I$(HOMEBREW_INCLUDE) $(PYTHON_INCLUDE) 
 LDFLAGS := $(PYTHON_LDFLAGS) $(BLAS_LIB) $(HOMEBREW_LIB)
 

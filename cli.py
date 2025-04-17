@@ -3,6 +3,21 @@ import argparse
 import sys
 import shlex
 
+# xcrun xctrace record \
+#   --template 'Time Profiler' \
+#   --all-processes \          
+#   --time-limit 10s \              
+#   --output profile.trace \
+#   --launch -- ./batch_var_es.sh
+
+# ./batch_var_es.sh &
+# PID=$!
+
+# xcrun xctrace record \
+#   --template 'Time Profiler' \
+#   --output profile.trace \
+#   --attach $PID
+
 # Import the C++ module built with pybind11.
 import _package as riskcalc
 
