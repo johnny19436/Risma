@@ -48,7 +48,9 @@ std::vector<double> Calculator::runMonteCarlo(const Portfolio& portfolio, int nu
     std::random_device rd;
     std::mt19937 gen(rd());
     // Normal distribution: mean 0, stddev 1.
-    std::normal_distribution<> dist(0.0, 1.0);
+    // std::normal_distribution<> dist(0.0, 1.0);
+    int degrees_of_freedom_ = 4;
+    std::student_t_distribution<> dist(degrees_of_freedom_);
     auto assets = portfolio.listAssets();
     for (int i = 0; i < num_simulations; ++i) {
         double portfolio_return = 0.0;
