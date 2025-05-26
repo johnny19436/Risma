@@ -4,7 +4,7 @@ set -euo pipefail
 CLI="python3 ./cli.py"
 PORTFOLIO="equal_weight"
 DATA_FOLDER="./data"
-SIMS=1000000
+SIMS=3000000
 CONF=0.95
 DATE_CMD=gdate  # use gdate on macOS; on Linux, use: DATE_CMD=date
 
@@ -33,46 +33,60 @@ WEIGHT=$(awk -v n="${#SYMBOLS[@]}" 'BEGIN { printf("%.6f", 1/n) }')
 TMPFILE=$(mktemp)
 trap "rm -f $TMPFILE" EXIT
 
-# Build interactive command script
+# First update the CSV file with all symbols
+echo "==> Updating price data..."
+python3 - "$DATA_FOLDER/prices.csv" "${SYMBOLS[@]}" << 'EOF'
+import sys
+import update_csv
+csv_file = sys.argv[1]
+symbols = sys.argv[2:]
+success = update_csv.update_csv_bulk(csv_file, symbols)
+sys.exit(0 if success else 1)
+EOF
+
+# Then build and run the portfolio commands
 {
-  echo "add_portfolio --name $PORTFOLIO --datafolder $DATA_FOLDER"
-  echo "switch_portfolio --name $PORTFOLIO"
-  for sym in "${SYMBOLS[@]}"; do
-    echo "add_asset --symbol $sym --weight $WEIGHT"
-  done
-  echo "echo_marker __TIMER_VAR__"
-  echo "compute_var --confidence $CONF --simulations $SIMS"
-  echo "echo_marker __TIMER_ES__"
-  echo "compute_es --confidence $CONF --simulations $SIMS"
-  echo "echo_marker __TIMER_DONE__"
+    echo "add_portfolio --name $PORTFOLIO --datafolder $DATA_FOLDER --skip-download"
+    echo "switch_portfolio --name $PORTFOLIO"
+    
+    # Add all assets (data is already downloaded)
+    for sym in "${SYMBOLS[@]}"; do
+        echo "add_asset --symbol $sym --weight $WEIGHT --skip-download"
+    done
+    
+    echo "echo_marker __TIMER_VAR__"
+    echo "compute_var --confidence $CONF --simulations $SIMS"
+    echo "echo_marker __TIMER_ES__"
+    echo "compute_es --confidence $CONF --simulations $SIMS"
+    echo "echo_marker __TIMER_DONE__"
 } > "$TMPFILE"
 
-echo "==> Running batch with ${#SYMBOLS[@]} assets..."
+echo "==> Running calculations with ${#SYMBOLS[@]} assets..."
 START_TOTAL=$($DATE_CMD +%s%3N)
 
-# Run CLI and intercept timing markers
+# Run CLI with timing markers
 $CLI interactive < "$TMPFILE" | awk -v start_total="$START_TOTAL" -v date_cmd="$DATE_CMD" '
-  function now() {
-    cmd = date_cmd " +%s%3N"
-    cmd | getline t
-    close(cmd)
-    return t
-  }
-  /<<__TIMER_VAR__>>/ {
-    start_var = now()
-    next
-  }
-  /<<__TIMER_ES__>>/ {
-    end_var = now()
-    print "⏱  Time spent computing VaR: " (end_var - start_var) " ms"
-    start_es = now()
-    next
-  }
-  /<<__TIMER_DONE__>>/ {
-    end_es = now()
-    print "⏱  Time spent computing ES:  " (end_es - start_es) " ms"
-    print "✅ Total execution time:     " (end_es - start_total) " ms"
-    next
-  }
-  { print }
+    function now() {
+        cmd = date_cmd " +%s%3N"
+        cmd | getline t
+        close(cmd)
+        return t
+    }
+    /<<__TIMER_VAR__>>/ {
+        start_var = now()
+        next
+    }
+    /<<__TIMER_ES__>>/ {
+        end_var = now()
+        print "⏱  Time spent computing VaR: " (end_var - start_var) " ms"
+        start_es = now()
+        next
+    }
+    /<<__TIMER_DONE__>>/ {
+        end_es = now()
+        print "⏱  Time spent computing ES:  " (end_es - start_es) " ms"
+        print "✅ Total execution time:     " (end_es - start_total) " ms"
+        next
+    }
+    { print }
 '

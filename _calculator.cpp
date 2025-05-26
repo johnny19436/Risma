@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <random>
 #include <cmath>
+#include <tbb/parallel_sort.h>
+#include <omp.h>
 
 namespace py = pybind11;
 
@@ -27,37 +29,87 @@ void Calculator::setConfidenceLevel(double confidenceLevel) {
 
 double Calculator::computeVaR(const Portfolio& portfolio, int num_simulations) {
     auto returns = runMonteCarlo(portfolio, num_simulations);
-    std::sort(returns.begin(), returns.end());
+    
+    // Use parallel sort for large arrays
+    if (returns.size() > 10000) {
+        #pragma omp parallel
+        {
+            #pragma omp single
+            tbb::parallel_sort(returns.begin(), returns.end());
+        }
+    } else {
+        std::sort(returns.begin(), returns.end());
+    }
+    
     int var_index = static_cast<int>((1.0 - confidence_level_) * num_simulations);
     return -returns[var_index] * portfolio.getAssetTotalWeight();
 }
 
 double Calculator::computeES(const Portfolio& portfolio, int num_simulations) {
     std::vector<double> returns = runMonteCarlo(portfolio, num_simulations);
-    std::sort(returns.begin(), returns.end());
+    
+    // Use parallel sort for large arrays
+    if (returns.size() > 10000) {
+        #pragma omp parallel
+        {
+            #pragma omp single
+            tbb::parallel_sort(returns.begin(), returns.end());
+        }
+    } else {
+        std::sort(returns.begin(), returns.end());
+    }
+    
     int var_index = static_cast<int>((1.0 - confidence_level_) * num_simulations);
     double es = 0.0;
-    for (int i = 0; i < var_index; ++i) {
-        es += returns[i];
+    
+    // Parallel reduction for ES calculation
+    #pragma omp parallel reduction(+:es)
+    {
+        #pragma omp for nowait
+        for (int i = 0; i < var_index; ++i) {
+            es += returns[i];
+        }
     }
+    
     return -(es / var_index) * portfolio.getAssetTotalWeight();
 }
 
 std::vector<double> Calculator::runMonteCarlo(const Portfolio& portfolio, int num_simulations) {
     std::vector<double> returns(num_simulations);
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    // Normal distribution: mean 0, stddev 1.
-    std::normal_distribution<> dist(0.0, 1.0);
     auto assets = portfolio.listAssets();
-    for (int i = 0; i < num_simulations; ++i) {
-        double portfolio_return = 0.0;
-        for (const auto& asset : assets) {
-            double z = dist(gen);
-            portfolio_return += asset.weight * (z * asset.volatility);
-        }
-        returns[i] = portfolio_return;
+    
+    // Get number of available threads
+    int num_threads = omp_get_max_threads();
+    std::vector<std::mt19937> generators(num_threads);
+    
+    // Initialize random number generators for each thread
+    #pragma omp parallel
+    {
+        int thread_id = omp_get_thread_num();
+        std::random_device rd;
+        generators[thread_id].seed(rd());
     }
+    
+    // Parallel Monte Carlo simulation
+    #pragma omp parallel
+    {
+        int thread_id = omp_get_thread_num();
+        // std::normal_distribution<> dist(0.0, 1.0);
+        int degrees_of_freedom_ = 4;
+        std::student_t_distribution<> dist(degrees_of_freedom_);
+
+        
+        #pragma omp for nowait
+        for (int i = 0; i < num_simulations; ++i) {
+            double portfolio_return = 0.0;
+            for (const auto& asset : assets) {
+                double z = dist(generators[thread_id]);
+                portfolio_return += asset.weight * (z * asset.volatility);
+            }
+            returns[i] = portfolio_return;
+        }
+    }
+    
     return returns;
 }
 

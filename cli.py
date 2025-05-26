@@ -145,6 +145,7 @@ def build_command_parsers():
     parser = argparse.ArgumentParser(prog="add_portfolio")
     parser.add_argument("--name", required=True)
     parser.add_argument("--datafolder", required=True)
+    parser.add_argument("--skip-download", action="store_true", help="Skip downloading data")
     commands["add_portfolio"] = (parser, add_portfolio)
 
     # del_portfolio
@@ -165,6 +166,7 @@ def build_command_parsers():
     parser = argparse.ArgumentParser(prog="add_asset")
     parser.add_argument("--symbol", required=True)
     parser.add_argument("--weight", type=float, required=True)
+    parser.add_argument("--skip-download", action="store_true", help="Skip downloading data")
     commands["add_asset"] = (parser, add_asset)
 
     # modify_asset
